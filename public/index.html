@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SongForge · AI Music Generator</title>
+  <meta name="description" content="Turn an idea into a full song in minutes with AI." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </span>
+      <span class="brand-name">SongForge</span>
+    </div>
+    <div class="credits" id="credits" title="Remaining SunoAPI credits">— credits</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel create">
+      <h1>Make a song</h1>
+      <p class="sub">Describe it, or take full control with your own lyrics and style.</p>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" role="tab" aria-selected="true" data-mode="simple">Simple</button>
+        <button class="tab" role="tab" aria-selected="false" data-mode="custom">Custom</button>
+      </div>
+
+      <form id="form" novalidate>
+        <!-- SIMPLE MODE -->
+        <div class="mode mode-simple">
+          <label for="prompt">Song description</label>
+          <textarea id="prompt" rows="4" maxlength="3000"
+            placeholder="An upbeat reggaeton song about summer in Lima with catchy Spanish chorus"></textarea>
+          <div class="chips" id="ideaChips"></div>
+        </div>
+
+        <!-- CUSTOM MODE -->
+        <div class="mode mode-custom" hidden>
+          <label for="title">Title</label>
+          <input id="title" type="text" maxlength="80" placeholder="Midnight in Miraflores" />
+
+          <label for="style">Style of music</label>
+          <input id="style" type="text" maxlength="1000" placeholder="indie pop, dreamy synths, female vocals, 110 bpm" />
+          <div class="chips" id="styleChips"></div>
+
+          <div class="lyrics-head">
+            <label for="lyrics">Lyrics</label>
+            <button type="button" class="link-btn" id="aiLyricsBtn">✨ Write with AI</button>
+          </div>
+          <div class="ai-lyrics" id="aiLyricsBox" hidden>
+            <input id="lyricsPrompt" type="text" maxlength="200" placeholder="What should the lyrics be about?" />
+            <button type="button" class="btn small" id="aiLyricsGo">Generate</button>
+          </div>
+          <textarea id="lyrics" rows="9" maxlength="5000"
+            placeholder="[Verse]&#10;Walking down the coast tonight...&#10;&#10;[Chorus]&#10;..."></textarea>
+
+          <details class="advanced">
+            <summary>Advanced</summary>
+            <label for="negativeTags">Exclude styles</label>
+            <input id="negativeTags" type="text" maxlength="1000" placeholder="heavy metal, screaming" />
+            <label>Vocal gender</label>
+            <div class="seg" id="vocalGender">
+              <button type="button" data-v="" class="on">Auto</button>
+              <button type="button" data-v="f">Female</button>
+              <button type="button" data-v="m">Male</button>
+            </div>
+            <label for="styleWeight">Style adherence <output id="swOut">0.65</output></label>
+            <input id="styleWeight" type="range" min="0" max="1" step="0.05" value="0.65" />
+            <label for="weird">Weirdness <output id="wOut">0.5</output></label>
+            <input id="weird" type="range" min="0" max="1" step="0.05" value="0.5" />
+          </details>
+        </div>
+
+        <div class="row">
+          <label class="toggle">
+            <input type="checkbox" id="instrumental" />
+            <span class="track"><span class="thumb"></span></span>
+            Instrumental
+          </label>
+          <select id="model" aria-label="Model">
+            <option value="V6" selected>V6 · best quality</option>
+            <option value="V6_MINI">V6 Mini · fast</option>
+            <option value="V6_WILD">V6 Wild · experimental</option>
+            <option value="V5_5">V5.5</option>
+            <option value="V5">V5</option>
+            <option value="V4_5PLUS">V4.5+</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn primary" id="createBtn">
+          <span class="btn-label">Create</span>
+        </button>
+        <p class="error" id="error" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="panel library">
+      <div class="lib-head">
+        <h2>Your songs</h2>
+        <button class="link-btn" id="clearBtn" type="button">Clear</button>
+      </div>
+      <div id="songs" class="songs"></div>
+      <div id="empty" class="empty">
+        <div class="eq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <p>Your generated songs will appear here.<br />Each request creates two versions.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Sticky player -->
+  <div class="player" id="player" hidden>
+    <img id="pCover" alt="" />
+    <div class="p-meta">
+      <div class="p-title" id="pTitle"></div>
+      <div class="p-tags" id="pTags"></div>
+    </div>
+    <audio id="audio" controls preload="none"></audio>
+  </div>
+
+  <!-- Password dialog (only used if APP_PASSWORD is set) -->
+  <dialog id="pwDialog">
+    <form method="dialog" id="pwForm">
+      <h3>Access password</h3>
+      <p>This generator is private. Enter the password to continue.</p>
+      <input id="pwInput" type="password" autocomplete="current-password" required />
+      <button class="btn primary" value="ok">Unlock</button>
+    </form>
+  </dialog>
+
+  <template id="songTpl">
+    <article class="song">
+      <div class="cover">
+        <img alt="" loading="lazy" />
+        <button class="play" type="button" aria-label="Play">▶</button>
+      </div>
+      <div class="info">
+        <div class="s-title"></div>
+        <div class="s-tags"></div>
+        <div class="s-status"></div>
+      </div>
+      <div class="actions">
+        <a class="icon-btn dl" download target="_blank" rel="noopener" title="Download MP3" hidden>⬇</a>
+        <button class="icon-btn lyr" type="button" title="Show lyrics" hidden>≡</button>
+      </div>
+      <pre class="s-lyrics" hidden></pre>
+    </article>
+  </template>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
